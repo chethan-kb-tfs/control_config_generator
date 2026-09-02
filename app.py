@@ -9,8 +9,24 @@ SQL. It only builds INSERT statement text for the user to copy.
 """
 
 from flask import Flask, render_template, request, jsonify
+import json
+import os
 
 app = Flask(__name__)
+
+VERSION_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "version.json")
+
+
+def load_version_info():
+    """Read version.json for display in the UI. Falls back to safe defaults."""
+    defaults = {"version": "0.0.0", "developed_by": "Unknown", "last_updated": "Unknown"}
+    try:
+        with open(VERSION_FILE, "r") as f:
+            info = json.load(f)
+        defaults.update({k: info.get(k, v) for k, v in defaults.items()})
+    except (FileNotFoundError, json.JSONDecodeError):
+        pass
+    return defaults
 
 
 # ---------------------------------------------------------------------------
@@ -436,7 +452,13 @@ def index():
         "index.html",
         src_sys_cd_options=SRC_SYS_CD_OPTIONS,
         target_bucket_options=TARGET_BUCKET_OPTIONS,
+        version_info=load_version_info(),
     )
+
+
+@app.route("/version")
+def version():
+    return jsonify(load_version_info())
 
 
 @app.route("/generate", methods=["POST"])
