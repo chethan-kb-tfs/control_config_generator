@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Databricks SQL Insert Generator</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<header class="app-header">
+    <h1>Databricks SQL Insert Generator</h1>
+    <p class="subtitle">Generate <code>control_table_test</code> and <code>config_table_test</code> INSERT statements locally. Nothing is executed against any database.</p>
+</header>
+
+<main class="container">
+
+    <!-- ============================================================ -->
+    <!-- CONTROL TABLE GENERATOR                                       -->
+    <!-- ============================================================ -->
+    <section class="card" id="control-section">
+        <h2>1. Control Table Generator</h2>
+
+        <p class="hint">
+            Each entry below is exactly one <code>src_sys_cd</code> +
+            <code>table_name</code> combination, with its own
+            <code>target_bucket</code>, <code>primary_key</code>,
+            <code>crt_by</code>, and <code>upt_by</code>. It generates one
+            <strong>initial</strong> row and one <strong>delta</strong> row.
+            To add another table for the same src_sys_cd, or the same table
+            under a different src_sys_cd, add another entry.
+        </p>
+
+        <div id="control-table-list" class="dynamic-list">
+            <!-- control entry cards injected here -->
+        </div>
+        <button type="button" class="btn btn-secondary" id="add-control-entry">+ Add Control Table Entry</button>
+
+        <div class="validation-box" id="control-errors"></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- CONFIG TABLE GENERATOR                                        -->
+    <!-- ============================================================ -->
+    <section class="card" id="config-section">
+        <h2>2. Config Table Generator</h2>
+
+        <p class="hint">
+            Each entry below is its own <code>src_sys_cd</code>. Inside an entry,
+            each table produces one shared <code>sql_config</code> row, plus
+            one <code>raw_table_config</code> row for every "Raw Config" you add to it.
+            To add another table under the same src_sys_cd, or the same table under a
+            different src_sys_cd, add another table or another entry.
+        </p>
+
+        <div id="config-entry-list" class="dynamic-list">
+            <!-- config entry cards injected here -->
+        </div>
+        <button type="button" class="btn btn-secondary" id="add-config-entry">+ Add Config Entry</button>
+
+        <div class="validation-box" id="config-errors"></div>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- ACTIONS                                                       -->
+    <!-- ============================================================ -->
+    <section class="actions">
+        <button type="button" class="btn btn-primary" id="generate-btn">Generate SQL</button>
+        <button type="button" class="btn btn-danger" id="clear-btn">Clear Form</button>
+    </section>
+
+    <!-- ============================================================ -->
+    <!-- OUTPUT                                                        -->
+    <!-- ============================================================ -->
+    <section class="card output-card" id="output-section" style="display:none;">
+        <div class="output-block">
+            <div class="output-header">
+                <h3>Control Table SQL (control_table_test)</h3>
+                <button type="button" class="btn btn-copy" data-target="control-output">Copy SQL</button>
+            </div>
+            <textarea id="control-output" class="sql-output" readonly placeholder="Generated control_table_test SQL will appear here..."></textarea>
+        </div>
+
+        <div class="output-block">
+            <div class="output-header">
+                <h3>Config Table SQL (config_table_test)</h3>
+                <button type="button" class="btn btn-copy" data-target="config-output">Copy SQL</button>
+            </div>
+            <textarea id="config-output" class="sql-output" readonly placeholder="Generated config_table_test SQL will appear here..."></textarea>
+        </div>
+    </section>
+
+</main>
+
+<div id="toast" class="toast"></div>
+
+<!-- Templates for dynamically added rows (cloned via JS) -->
+<template id="control-entry-template">
+    <div class="dynamic-row control-entry">
+        <div class="group-header">
+            <h4 class="entry-title">Control Table Entry</h4>
+            <button type="button" class="btn btn-remove remove-control-entry">Remove Entry</button>
+        </div>
+
+        <div class="field-grid">
+            <div class="field">
+                <label>src_sys_cd <span class="req">*</span></label>
+                <select class="ctl-src-sys-cd">
+                    <option value="">-- Select src_sys_cd --</option>
+                    {% for opt in src_sys_cd_options %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>table_name <span class="req">*</span></label>
+                <input type="text" class="ctl-table-name" placeholder="e.g. table_1">
+            </div>
+            <div class="field">
+                <label>target_bucket <span class="req">*</span></label>
+                <select class="ctl-target-bucket">
+                    <option value="">-- Select target_bucket --</option>
+                    {% for opt in target_bucket_options %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="field">
+                <label>primary_key <span class="req">*</span></label>
+                <input type="text" class="ctl-primary-key" placeholder="e.g. sls_invc_key">
+            </div>
+            <div class="field">
+                <label>crt_by <span class="req">*</span></label>
+                <input type="text" class="ctl-crt-by" placeholder="e.g. user@thermofisher.com">
+            </div>
+            <div class="field">
+                <label>upt_by <span class="req">*</span></label>
+                <input type="text" class="ctl-upt-by" placeholder="e.g. user@thermofisher.com">
+            </div>
+        </div>
+
+        <p class="hint-inline entry-footnote">Generates 1 initial row + 1 delta row for this src_sys_cd / table_name.</p>
+    </div>
+</template>
+
+<template id="config-entry-template">
+    <div class="dynamic-row config-entry">
+        <div class="group-header">
+            <div class="field entry-src-sys-cd">
+                <label>src_sys_cd <span class="req">*</span></label>
+                <select class="cfg-src-sys-cd">
+                    <option value="">-- Select src_sys_cd --</option>
+                    {% for opt in src_sys_cd_options %}
+                    <option value="{{ opt }}">{{ opt }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <button type="button" class="btn btn-remove remove-config-entry">Remove Entry</button>
+        </div>
+
+        <div class="sub-section">
+            <div class="sub-section-header">
+                <h4>Tables</h4>
+                <button type="button" class="btn btn-secondary btn-small add-config-table">+ Add Table</button>
+            </div>
+            <div class="config-table-list"><!-- table group cards injected here --></div>
+        </div>
+    </div>
+</template>
+
+<template id="config-table-row-template">
+    <div class="dynamic-row config-table-group">
+        <div class="group-header">
+            <div class="field group-table-name">
+                <label>table_name <span class="req">*</span></label>
+                <input type="text" class="cfg-table-name" placeholder="e.g. table_1">
+            </div>
+            <button type="button" class="btn btn-remove remove-config-table">Remove Table</button>
+        </div>
+
+        <div class="sub-section">
+            <div class="sub-section-header">
+                <h4>Raw Table Configs <span class="hint-inline">(1 row each in raw_table_config)</span></h4>
+                <button type="button" class="btn btn-secondary btn-small add-raw-config">+ Add Raw Config</button>
+            </div>
+            <div class="raw-config-list"><!-- raw config rows injected here --></div>
+        </div>
+
+        <div class="sub-section">
+            <h4>SQL Config <span class="hint-inline">(exactly 1 row in sql_config for this table)</span></h4>
+            <div class="field-grid small">
+                <div class="field">
+                    <label>sql_filepaths_csv_str_full</label>
+                    <input type="text" class="cfg-sql-full">
+                </div>
+                <div class="field">
+                    <label>sql_filepaths_csv_str_incr</label>
+                    <input type="text" class="cfg-sql-incr">
+                </div>
+                <div class="field">
+                    <label>uc</label>
+                    <input type="text" class="cfg-sqlcfg-uc">
+                </div>
+                <div class="field">
+                    <label>uc_schema</label>
+                    <input type="text" class="cfg-sqlcfg-uc-schema">
+                </div>
+                <div class="field">
+                    <label>uc_table</label>
+                    <input type="text" class="cfg-sqlcfg-uc-table">
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="raw-config-row-template">
+    <div class="dynamic-row raw-config-row">
+        <div class="field-grid small">
+            <div class="field">
+                <label>src_table_path</label>
+                <input type="text" class="raw-src-table-path">
+            </div>
+            <div class="field">
+                <label>spark_view_name</label>
+                <input type="text" class="raw-spark-view-name">
+            </div>
+            <div class="field">
+                <label>uc</label>
+                <input type="text" class="raw-uc">
+            </div>
+            <div class="field">
+                <label>uc_schema</label>
+                <input type="text" class="raw-uc-schema">
+            </div>
+            <div class="field">
+                <label>uc_table</label>
+                <input type="text" class="raw-uc-table">
+            </div>
+        </div>
+        <button type="button" class="btn btn-remove btn-small remove-raw-config">Remove</button>
+    </div>
+</template>
+
+<script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
